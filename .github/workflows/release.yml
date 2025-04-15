@@ -18,17 +18,14 @@ jobs:
         run: choco install python cmake ninja git perl -y
 
       - name: Configure and prepare
-        working-directory: Multigram
         run: |
           python configure.py --os=win
           python Telegram/build/prepare/prepare.py
 
       - name: Build Telegram
-        working-directory: Multigram
         run: cmake --build out --config Release
 
       - name: Package zip
-        working-directory: Multigram
         run: |
           mkdir zip-out
           copy out\Release\Telegram.exe zip-out\
@@ -38,7 +35,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: telegram-windows
-          path: Multigram/telegram-windows.zip
+          path: telegram-windows.zip
 
   build-macos:
     runs-on: macos-latest
@@ -52,17 +49,14 @@ jobs:
           brew install cmake ninja python qt@5 create-dmg
 
       - name: Configure and prepare
-        working-directory: Multigram
         run: |
           python3 configure.py --os=mac
           python3 Telegram/build/prepare/prepare.py
 
       - name: Build Telegram
-        working-directory: Multigram
         run: cmake --build out --config Release
 
       - name: Create DMG
-        working-directory: Multigram
         run: |
           mkdir dmg-out
           create-dmg --volname "Telegram" \
@@ -75,4 +69,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: telegram-macos
-          path: Multigram/dmg-out/Telegram.dmg
+          path: dmg-out/Telegram.dmg
