@@ -1,0 +1,72 @@
+name: Custom Build Release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: choco install python cmake ninja git perl -y
+
+      - name: Configure and prepare
+        run: |
+          python configure.py --os=win
+          python Telegram/build/prepare/prepare.py
+
+      - name: Build Telegram
+        run: cmake --build out --config Release
+
+      - name: Package zip
+        run: |
+          mkdir zip-out
+          copy out\Release\Telegram.exe zip-out\
+          powershell -Command "Compress-Archive -Path zip-out\* -DestinationPath telegram-windows.zip"
+
+      - name: Upload zip
+        uses: actions/upload-artifact@v3
+        with:
+          name: telegram-windows
+          path: telegram-windows.zip
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          brew install cmake ninja python qt@5 create-dmg
+
+      - name: Configure and prepare
+        run: |
+          python3 configure.py --os=mac
+          python3 Telegram/build/prepare/prepare.py
+
+      - name: Build Telegram
+        run: cmake --build out --config Release
+
+      - name: Create DMG
+        run: |
+          mkdir dmg-out
+          create-dmg --volname "Telegram" \
+            --window-size 800 400 \
+            --icon "Telegram.app" 200 190 \
+            --app-drop-link 600 185 \
+            dmg-out/Telegram.dmg out/Release/Telegram.app
+
+      - name: Upload DMG
+        uses: actions/upload-artifact@v3
+        with:
+          name: telegram-macos
+          path: dmg-out/Telegram.dmg
