@@ -11,6 +11,9 @@ jobs:
 
     env:
       PREPARE_PATH: "Telegram/build/prepare/prepare.py"
+      TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
+      TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
+      TBUILD: ${{ github.workspace }}\TBuild
 
     defaults:
       run:
@@ -19,9 +22,8 @@ jobs:
     steps:
       - name: Init Build Directories
         run: |
-          mkdir %userprofile%\TBuild\Libraries
-          mklink /d %GITHUB_WORKSPACE%\TBuild %userprofile%\TBuild
-          echo TBUILD=%GITHUB_WORKSPACE%\TBuild>>%GITHUB_ENV%
+          mkdir %TBUILD%\Libraries
+          mklink /d %GITHUB_WORKSPACE%\TBuild %TBUILD%
 
       - name: Get Repository Name
         shell: bash
@@ -62,7 +64,9 @@ jobs:
             -D CMAKE_CXX_FLAGS="/WX" ^
             -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON ^
             -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON ^
-            -D DESKTOP_APP_NO_PDB=ON
+            -D DESKTOP_APP_NO_PDB=ON ^
+            -D TDESKTOP_API_ID=%TELEGRAM_API_ID% ^
+            -D TDESKTOP_API_HASH=%TELEGRAM_API_HASH%
           cmake --build ..\out --config Release
 
       - name: Package Windows ZIP
@@ -84,6 +88,8 @@ jobs:
 
     env:
       PREPARE_PATH: "Telegram/build/prepare/prepare.py"
+      TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
+      TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
 
     steps:
       - name: Get Repository Name
@@ -121,9 +127,11 @@ jobs:
             -D CMAKE_C_FLAGS="-Werror" \
             -D CMAKE_CXX_FLAGS="-Werror" \
             -D CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO \
-            -D TDESKTOP_API_TEST=ON \
+            -D TDESKTOP_API_TEST=OFF \
             -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON \
-            -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON
+            -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON \
+            -D TDESKTOP_API_ID=${TELEGRAM_API_ID} \
+            -D TDESKTOP_API_HASH=${TELEGRAM_API_HASH}
           cd ../out
           xcodebuild -project Telegram.xcodeproj -scheme Telegram -configuration Release -arch arm64
 
