@@ -20,7 +20,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-          path: ${{ env.TBUILD }}\tdesktop
+          path: "${{ format('{0}\\tdesktop', env.TBUILD) }}"
 
       - uses: ilammy/msvc-dev-cmd@v1.13.0
         with:
@@ -29,13 +29,13 @@ jobs:
       - name: Cache: ThirdParty
         uses: actions/cache@v4
         with:
-          path: ${{ env.TBUILD }}\ThirdParty
+          path: "${{ env.TBUILD }}\\ThirdParty"
           key: ${{ runner.os }}-thirdparty-${{ hashFiles(format('{0}/tdesktop/Telegram/build/prepare/prepare.py', env.TBUILD)) }}
 
       - name: Cache: Libraries
         uses: actions/cache@v4
         with:
-          path: ${{ env.TBUILD }}\Libraries
+          path: "${{ env.TBUILD }}\\Libraries"
           key: ${{ runner.os }}-libraries-${{ hashFiles(format('{0}/tdesktop/Telegram/build/prepare/prepare.py', env.TBUILD)) }}
 
       - name: Prepare Libraries
@@ -67,7 +67,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: telegram-windows
-          path: %TBUILD%\tdesktop\out\Release\telegram-windows.zip
+          path: "${{ env.TBUILD }}\\tdesktop\\out\\Release\\telegram-windows.zip"
 
   build-macos:
     runs-on: macos-13
