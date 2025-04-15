@@ -17,33 +17,33 @@ jobs:
         shell: cmd
 
     steps:
-      - name: Init build dirs
+      - name: Init Build Directories
         run: |
           mkdir %userprofile%\TBuild\Libraries
           mklink /d %GITHUB_WORKSPACE%\TBuild %userprofile%\TBuild
           echo TBUILD=%GITHUB_WORKSPACE%\TBuild>>%GITHUB_ENV%
 
-      - name: Get repo name
+      - name: Get Repository Name
         shell: bash
         run: echo "REPO_NAME=${GITHUB_REPOSITORY##*/}" >> $GITHUB_ENV
 
       - uses: ilammy/msvc-dev-cmd@v1
-        name: Native Tools Command Prompt
+        name: MSVC Dev Environment
         with:
           arch: x64
 
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-          path: "${{ env.TBUILD }}\\${{ env.REPO_NAME }}"
+          path: "${{ format('{0}\\tdesktop', env.TBUILD) }}"
 
-      - name: Cache: ThirdParty
+      - name: ThirdParty Cache
         uses: actions/cache@v4
         with:
           path: "${{ env.TBUILD }}\\ThirdParty"
           key: ${{ runner.os }}-thirdparty-${{ hashFiles(format('{0}\\{1}', env.REPO_NAME, env.PREPARE_PATH)) }}
 
-      - name: Cache: Libraries
+      - name: Libraries Cache
         uses: actions/cache@v4
         with:
           path: "${{ env.TBUILD }}\\Libraries"
@@ -54,42 +54,39 @@ jobs:
           cd %TBUILD%
           %REPO_NAME%\Telegram\build\prepare\win.bat skip-release silent
 
-      - name: Configure & Build
+      - name: Configure and Build
         run: |
           cd %TBUILD%\%REPO_NAME%\Telegram
-
-          call configure.bat ^
-          x64 ^
-          -D CMAKE_C_FLAGS="/WX" ^
-          -D CMAKE_CXX_FLAGS="/WX" ^
-          -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON ^
-          -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON ^
-          -D DESKTOP_APP_NO_PDB=ON
-
+          call configure.bat x64 ^
+            -D CMAKE_C_FLAGS="/WX" ^
+            -D CMAKE_CXX_FLAGS="/WX" ^
+            -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON ^
+            -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON ^
+            -D DESKTOP_APP_NO_PDB=ON
           cmake --build ..\out --config Release
 
-      - name: Package
+      - name: Package Windows ZIP
         run: |
           cd %TBUILD%\%REPO_NAME%\out\Release
           mkdir artifact
           copy Telegram.exe artifact\
           powershell -Command "Compress-Archive -Path artifact\* -DestinationPath telegram-windows.zip"
 
-      - name: Upload ZIP
+      - name: Upload Windows ZIP
         uses: actions/upload-artifact@v4
         with:
           name: telegram-windows
-          path: ${{ env.TBUILD }}\\${{ env.REPO_NAME }}\\out\\Release\\telegram-windows.zip
+          path: "${{ env.TBUILD }}\\${{ env.REPO_NAME }}\\out\\Release\\telegram-windows.zip"
 
   build-macos:
-    name: MacOS
+    name: macOS
     runs-on: macos-13
 
     env:
       PREPARE_PATH: "Telegram/build/prepare/prepare.py"
 
     steps:
-      - name: Get repo name
+      - name: Get Repository Name
         run: echo "REPO_NAME=${GITHUB_REPOSITORY##*/}" >> $GITHUB_ENV
 
       - uses: actions/checkout@v4
@@ -97,18 +94,18 @@ jobs:
           submodules: recursive
           path: ${{ env.REPO_NAME }}
 
-      - name: Install Dependencies
+      - name: Install Build Dependencies
         run: |
           brew install automake meson nasm ninja pkg-config create-dmg
           sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
 
-      - name: Cache: ThirdParty
+      - name: ThirdParty Cache
         uses: actions/cache@v4
         with:
           path: ThirdParty
           key: macos-thirdparty-${{ hashFiles(format('{0}/{1}', env.REPO_NAME, env.PREPARE_PATH)) }}
 
-      - name: Cache: Libraries
+      - name: Libraries Cache
         uses: actions/cache@v4
         with:
           path: Libraries
@@ -117,22 +114,20 @@ jobs:
       - name: Prepare Libraries
         run: ./${{ env.REPO_NAME }}/Telegram/build/prepare/mac.sh skip-release silent
 
-      - name: Configure & Build
+      - name: Configure and Build
         run: |
           cd $REPO_NAME/Telegram
-
           ./configure.sh \
-          -D CMAKE_C_FLAGS="-Werror" \
-          -D CMAKE_CXX_FLAGS="-Werror" \
-          -D CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO \
-          -D TDESKTOP_API_TEST=ON \
-          -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON \
-          -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON
-
+            -D CMAKE_C_FLAGS="-Werror" \
+            -D CMAKE_CXX_FLAGS="-Werror" \
+            -D CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO \
+            -D TDESKTOP_API_TEST=ON \
+            -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON \
+            -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON
           cd ../out
           xcodebuild -project Telegram.xcodeproj -scheme Telegram -configuration Release -arch arm64
 
-      - name: Package DMG
+      - name: Package macOS DMG
         run: |
           cd $REPO_NAME/out/Release
           create-dmg --volname "Telegram" \
@@ -141,7 +136,7 @@ jobs:
             --app-drop-link 600 185 \
             Telegram.dmg Telegram.app
 
-      - name: Upload DMG
+      - name: Upload macOS DMG
         uses: actions/upload-artifact@v4
         with:
           name: telegram-macos
