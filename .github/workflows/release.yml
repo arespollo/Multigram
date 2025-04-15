@@ -2,78 +2,94 @@ name: Custom Release Build
 
 on:
   workflow_dispatch:
-  push:
-    tags:
-      - 'v*'
 
 jobs:
+
   build-windows:
+    name: Windows
     runs-on: windows-latest
 
+    env:
+      PREPARE_PATH: "Telegram/build/prepare/prepare.py"
+
+    defaults:
+      run:
+        shell: cmd
+
     steps:
-      - name: Init paths
+      - name: Init build dirs
         run: |
           mkdir %userprofile%\TBuild\Libraries
           mklink /d %GITHUB_WORKSPACE%\TBuild %userprofile%\TBuild
           echo TBUILD=%GITHUB_WORKSPACE%\TBuild>>%GITHUB_ENV%
 
+      - name: Get repo name
+        shell: bash
+        run: echo "REPO_NAME=${GITHUB_REPOSITORY##*/}" >> $GITHUB_ENV
+
+      - uses: ilammy/msvc-dev-cmd@v1
+        name: Native Tools Command Prompt
+        with:
+          arch: x64
+
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-          path: "${{ format('{0}\\tdesktop', env.TBUILD) }}"
-
-      - uses: ilammy/msvc-dev-cmd@v1.13.0
-        with:
-          arch: x64
+          path: "${{ env.TBUILD }}\\${{ env.REPO_NAME }}"
 
       - name: Cache: ThirdParty
         uses: actions/cache@v4
         with:
           path: "${{ env.TBUILD }}\\ThirdParty"
-          key: ${{ runner.os }}-thirdparty-${{ hashFiles(format('{0}/tdesktop/Telegram/build/prepare/prepare.py', env.TBUILD)) }}
+          key: ${{ runner.os }}-thirdparty-${{ hashFiles(format('{0}\\{1}', env.REPO_NAME, env.PREPARE_PATH)) }}
 
       - name: Cache: Libraries
         uses: actions/cache@v4
         with:
           path: "${{ env.TBUILD }}\\Libraries"
-          key: ${{ runner.os }}-libraries-${{ hashFiles(format('{0}/tdesktop/Telegram/build/prepare/prepare.py', env.TBUILD)) }}
+          key: ${{ runner.os }}-libraries-${{ hashFiles(format('{0}\\{1}', env.REPO_NAME, env.PREPARE_PATH)) }}
 
       - name: Prepare Libraries
         run: |
           cd %TBUILD%
-          tdesktop\Telegram\build\prepare\win.bat skip-release silent
+          %REPO_NAME%\Telegram\build\prepare\win.bat skip-release silent
 
-      - name: Configure Build
+      - name: Configure & Build
         run: |
-          cd %TBUILD%\tdesktop\Telegram
-          call configure.bat x64 ^
-            -D CMAKE_C_FLAGS="/WX" ^
-            -D CMAKE_CXX_FLAGS="/WX" ^
-            -D DESKTOP_APP_DISABLE_AUTOUPDATE=OFF ^
-            -D DESKTOP_APP_DISABLE_CRASH_REPORTS=OFF ^
-            -D DESKTOP_APP_NO_PDB=ON
+          cd %TBUILD%\%REPO_NAME%\Telegram
 
-      - name: Build Project
-        run: cmake --build %TBUILD%\tdesktop\out --config Release
+          call configure.bat ^
+          x64 ^
+          -D CMAKE_C_FLAGS="/WX" ^
+          -D CMAKE_CXX_FLAGS="/WX" ^
+          -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON ^
+          -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON ^
+          -D DESKTOP_APP_NO_PDB=ON
 
-      - name: Package ZIP
+          cmake --build ..\out --config Release
+
+      - name: Package
         run: |
-          cd %TBUILD%\tdesktop\out\Release
+          cd %TBUILD%\%REPO_NAME%\out\Release
           mkdir artifact
           copy Telegram.exe artifact\
           powershell -Command "Compress-Archive -Path artifact\* -DestinationPath telegram-windows.zip"
 
-      - name: Upload Artifact
+      - name: Upload ZIP
         uses: actions/upload-artifact@v4
         with:
           name: telegram-windows
-          path: "${{ env.TBUILD }}\\tdesktop\\out\\Release\\telegram-windows.zip"
+          path: ${{ env.TBUILD }}\\${{ env.REPO_NAME }}\\out\\Release\\telegram-windows.zip
 
   build-macos:
+    name: MacOS
     runs-on: macos-13
 
+    env:
+      PREPARE_PATH: "Telegram/build/prepare/prepare.py"
+
     steps:
-      - name: Get repository name
+      - name: Get repo name
         run: echo "REPO_NAME=${GITHUB_REPOSITORY##*/}" >> $GITHUB_ENV
 
       - uses: actions/checkout@v4
@@ -81,9 +97,8 @@ jobs:
           submodules: recursive
           path: ${{ env.REPO_NAME }}
 
-      - name: Setup Homebrew + Deps
+      - name: Install Dependencies
         run: |
-          brew update
           brew install automake meson nasm ninja pkg-config create-dmg
           sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
 
@@ -91,31 +106,30 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ThirdParty
-          key: macos-thirdparty-${{ hashFiles(format('{0}/Telegram/build/prepare/prepare.py', env.REPO_NAME)) }}
+          key: macos-thirdparty-${{ hashFiles(format('{0}/{1}', env.REPO_NAME, env.PREPARE_PATH)) }}
 
       - name: Cache: Libraries
         uses: actions/cache@v4
         with:
           path: Libraries
-          key: macos-libraries-${{ hashFiles(format('{0}/Telegram/build/prepare/prepare.py', env.REPO_NAME)) }}
+          key: macos-libraries-${{ hashFiles(format('{0}/{1}', env.REPO_NAME, env.PREPARE_PATH)) }}
 
       - name: Prepare Libraries
-        run: ./tdesktop/Telegram/build/prepare/mac.sh skip-release silent
+        run: ./${{ env.REPO_NAME }}/Telegram/build/prepare/mac.sh skip-release silent
 
-      - name: Configure
+      - name: Configure & Build
         run: |
           cd $REPO_NAME/Telegram
-          ./configure.sh \
-            -D CMAKE_C_FLAGS="-Werror" \
-            -D CMAKE_CXX_FLAGS="-Werror" \
-            -D CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO \
-            -D TDESKTOP_API_TEST=ON \
-            -D DESKTOP_APP_DISABLE_AUTOUPDATE=OFF \
-            -D DESKTOP_APP_DISABLE_CRASH_REPORTS=OFF
 
-      - name: Build Project
-        run: |
-          cd $REPO_NAME/out
+          ./configure.sh \
+          -D CMAKE_C_FLAGS="-Werror" \
+          -D CMAKE_CXX_FLAGS="-Werror" \
+          -D CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO \
+          -D TDESKTOP_API_TEST=ON \
+          -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON \
+          -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON
+
+          cd ../out
           xcodebuild -project Telegram.xcodeproj -scheme Telegram -configuration Release -arch arm64
 
       - name: Package DMG
