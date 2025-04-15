@@ -32,7 +32,7 @@ jobs:
           powershell -Command "Compress-Archive -Path zip-out\* -DestinationPath telegram-windows.zip"
 
       - name: Upload zip
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: telegram-windows
           path: telegram-windows.zip
@@ -66,7 +66,7 @@ jobs:
             dmg-out/Telegram.dmg out/Release/Telegram.app
 
       - name: Upload DMG
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: telegram-macos
           path: dmg-out/Telegram.dmg
